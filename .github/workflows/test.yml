@@ -1,0 +1,43 @@
+name: File Download
+
+on:
+  repository_dispatch:
+    types: [file-download]
+
+jobs:
+  file_download:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Download file
+        id: download
+        run: |
+          download_url="${{ github.event.client_payload.download_url }}"
+          wget -O downloaded_file.osr "${download_url}"
+
+      - name: Check download status
+        id: check_status
+        run: |
+          if [ -f downloaded_file.osr ]; then
+            echo "::set-output name=status::success"
+          else
+            echo "::set-output name=status::fail"
+          fi
+
+      - name: Send status to Discord webhook
+        if: ${{ steps.check_status.outputs.status == 'success' }}
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+            -d '{"content": "Successful"}' \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
+
+      - name: Send failure status to Discord webhook
+        if: ${{ steps.check_status.outputs.status == 'fail' }}
+        run: |
+          debug_info=$(cat downloaded_file.osr)
+          curl -X POST -H "Content-Type: application/json" \
+            -d '{"content": "Fail: Debug Info: '"$debug_info"'"}' \
+            ${{ secrets.DISCORD_WEBHOOK_URL }}
